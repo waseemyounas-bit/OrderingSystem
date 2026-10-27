@@ -1,34 +1,24 @@
 version: 2
-
 updates:
-  - {
-      package-ecosystem: "docker",
-      directory: "/docker",
-      schedule: { interval: "daily" },
-      ignore: [
-        {
-          dependency-name: "datalust/seq",
-          versions: ["2025.2"],
-          update-types: ["version-update:semver-patch"]
-        }
-        
-      ]
-    }
-  
-  - {
-      package-ecosystem: "github-actions",
-      directory: "/",
-      schedule: { interval: "daily" }
-    }
+  - package-ecosystem: docker
+    directories: ["/docker/*"]
+    schedule: { interval: weekly }
 
-  - {
-      package-ecosystem: "npm",
-      directory: "/src/webclient",
-      schedule: { interval: "daily" }
-    }
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule: { interval: weekly }
+    ignore:
+      - dependency-name: "datalust/seq"
+        update-types: ["version-update:semver-major"]
 
-  - {
-      package-ecosystem: "nuget",
-      directory: "/",
-      schedule: { interval: "daily" }
-    }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+
+  - package-ecosystem: npm
+    directory: "/src/WebClient"
+    schedule: { interval: weekly }
+
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule: { interval: weekly }

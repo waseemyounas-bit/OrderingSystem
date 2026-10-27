@@ -2,65 +2,56 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
 
-concurrency: 
+concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-
   backend:
     name: Build and Test Backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-      - name: Restore dependencies
-        run: dotnet restore
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-      - name: Test
-        run: dotnet test --no-build --verbosity normal --configuration Release
-      
+      - run: dotnet restore OrderingSystem.slnx
+      - run: dotnet build OrderingSystem.slnx --no-restore -c Release
+      - run: dotnet test OrderingSystem.slnx --no-build -c Release
+
   frontend:
-    name: Build and Test Frontend
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/WebClient
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/WebClient/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # - run: npm test -- --watch=false   # once spec files exist
+
+  docker-lint:
+    name: Dockerfile + compose check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - uses: hadolint/hadolint-action@v3.1.0
         with:
-          node-version: 24
-          cache: "npm"
-          cache-dependency-path: src/webclient/package-lock.json
-      - name: Install dependencies
-        run: npm install
-      - name: Build
-        run: npm run build --if-present --configuration Production
-      - name: Test
-        run: npm test --if-present
-
-    docker-lint:
-      name: Dockerfile + compose check
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v5
-        - name: Lint Dockerfile
-          uses: redcoolbeans/dockerfilelint-action@v1.0.0
-          with:
-            dockerfile: docker/product-service/Dockerfile
-        - name: Lint docker-compose.yml
-          uses: redcoolbeans/dockerfilelint-action@v1.0.0
-          with:
-            dockerfile: docker-compose.yml
-        - run: docker-compose config -q
-        - run: for f in docker/*.Dockerfile; do docker build --check -f $f .; done
+          recursive: true
+          dockerfile: Dockerfile          # finds every docker/*/Dockerfile
+      - run: cp .env.example .env         # .env is git-ignored
+      - run: docker compose config --quiet
+      - run: for f in docker/*/Dockerfile; do docker build --check -f "$f" .; done
