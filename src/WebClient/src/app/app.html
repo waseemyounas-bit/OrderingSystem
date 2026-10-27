@@ -1,0 +1,47 @@
+<header class="topbar">
+  <div class="brand">Ordering System <small>microservices demo</small></div>
+  <nav>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      Shop @if (cart.count() > 0) { <span class="pill">{{ cart.count() }}</span> }
+    </a>
+    <a routerLink="/orders" routerLinkActive="active">Orders</a>
+    <a routerLink="/payments" routerLinkActive="active">Payments</a>
+    <a routerLink="/chaos-lab" routerLinkActive="active">Circuit breaker lab</a>
+  </nav>
+  <div class="tools">
+    <a href="http://localhost:8081" target="_blank" rel="noopener">Seq logs</a>
+    <a href="http://localhost:15672" target="_blank" rel="noopener">RabbitMQ</a>
+    <a href="/swagger" target="_blank" rel="noopener">Swagger</a>
+  </div>
+</header>
+
+<main>
+  <router-outlet />
+</main>
+
+<!-- Every HTTP call the browser made: what it called, how long it took, and its correlation id -->
+<footer class="activity" [class.collapsed]="!showActivity()">
+  <div class="row-between">
+    <button class="link" (click)="showActivity.set(!showActivity())">
+      {{ showActivity() ? '▾' : '▸' }} API activity (browser &rarr; API gateway)
+    </button>
+    <button class="link" (click)="activity.clear()">clear</button>
+  </div>
+  @if (showActivity()) {
+    <table>
+      <tbody>
+        @for (c of activity.calls(); track $index) {
+          <tr>
+            <td>{{ c.at | date: 'HH:mm:ss' }}</td>
+            <td><strong>{{ c.method }}</strong> {{ c.url }}</td>
+            <td><span class="code" [attr.data-ok]="c.status >= 200 && c.status < 300">{{ c.status || 'ERR' }}</span></td>
+            <td>{{ c.durationMs }} ms</td>
+            <td><code>{{ c.correlationId }}</code></td>
+          </tr>
+        } @empty {
+          <tr><td class="muted">No calls yet.</td></tr>
+        }
+      </tbody>
+    </table>
+  }
+</footer>

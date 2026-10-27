@@ -1,0 +1,124 @@
+### =====================================================================
+###  Demo requests - all go through the API GATEWAY (port 5000).
+###  VS Code: install the "REST Client" extension, then click "Send Request".
+###  Visual Studio / Rider support .http files natively.
+### =====================================================================
+
+@gateway = http://localhost:5000
+
+@laptop     = 11111111-1111-1111-1111-111111111111
+@phone      = 22222222-2222-2222-2222-222222222222
+@headphones = 33333333-3333-3333-3333-333333333333
+@watch      = 44444444-4444-4444-4444-444444444444
+
+### Gateway info
+GET {{gateway}}/
+
+### List products (note the stock quantities, check again after orders)
+GET {{gateway}}/api/products/
+
+
+### ---------------------------------------------------------------------
+### SCENARIO 1 - HAPPY PATH  (total 259.98 <= 1000)
+### Saga: ReserveStock -> StockReserved -> ProcessPayment -> PaymentSucceeded -> Confirmed
+### ---------------------------------------------------------------------
+# @name happyOrder
+POST {{gateway}}/api/orders/
+Content-Type: application/json
+X-Correlation-Id: demo-happy-path-001
+
+{
+  "customerEmail": "alice@example.com",
+  "items": [ { "productId": "{{headphones}}", "quantity": 2 } ]
+}
+
+### Order status (poll after ~1 second: Pending -> Confirmed)
+GET {{gateway}}/api/orders/{{happyOrder.response.body.orderId}}
+
+### Saga timeline for that order
+GET {{gateway}}/api/orders/{{happyOrder.response.body.orderId}}/saga
+
+
+### ---------------------------------------------------------------------
+### SCENARIO 2 - PAYMENT FAILS -> COMPENSATION  (laptop = 1499 > 1000 limit)
+### Saga: ReserveStock -> StockReserved -> ProcessPayment -> PaymentFailed
+###       -> ReleaseStock (compensation) -> StockReleased -> Cancelled
+### Check product stock before/after: it must be unchanged in the end.
+### ---------------------------------------------------------------------
+# @name failedPayment
+POST {{gateway}}/api/orders/
+Content-Type: application/json
+X-Correlation-Id: demo-compensation-001
+
+{
+  "customerEmail": "bob@example.com",
+  "items": [ { "productId": "{{laptop}}", "quantity": 1 } ]
+}
+
+###
+GET {{gateway}}/api/orders/{{failedPayment.response.body.orderId}}/saga
+
+
+### ---------------------------------------------------------------------
+### SCENARIO 3 - OUT OF STOCK  (watch has only 2 in stock)
+### Saga: ReserveStock -> StockReservationFailed -> Cancelled (nothing to compensate)
+### ---------------------------------------------------------------------
+# @name outOfStock
+POST {{gateway}}/api/orders/
+Content-Type: application/json
+
+{
+  "customerEmail": "carol@example.com",
+  "items": [ { "productId": "{{watch}}", "quantity": 5 } ]
+}
+
+###
+GET {{gateway}}/api/orders/{{outOfStock.response.body.orderId}}/saga
+
+
+### ---------------------------------------------------------------------
+### SCENARIO 4 - CIRCUIT BREAKER
+###  1) enable chaos  2) send the order 2-3 times (each = 3 attempts with retries)
+###  3) circuit OPENS -> next order fails instantly with 503
+###  4) disable chaos, wait 20s -> HALF-OPEN -> next order succeeds -> CLOSED
+### ---------------------------------------------------------------------
+POST {{gateway}}/api/products/chaos
+Content-Type: application/json
+
+{ "enabled": true, "delayMs": 0 }
+
+### Place an order while ProductService is "broken" (repeat this a few times)
+POST {{gateway}}/api/orders/
+Content-Type: application/json
+
+{
+  "customerEmail": "dave@example.com",
+  "items": [ { "productId": "{{phone}}", "quantity": 1 } ]
+}
+
+### Circuit state: Closed / Open / HalfOpen
+GET {{gateway}}/api/orders/circuit-breaker
+
+### Heal the service
+POST {{gateway}}/api/products/chaos
+Content-Type: application/json
+
+{ "enabled": false, "delayMs": 0 }
+
+
+### ---------------------------------------------------------------------
+### Other endpoints
+### ---------------------------------------------------------------------
+GET {{gateway}}/api/orders/
+
+###
+GET {{gateway}}/api/payments/
+
+### Create a product
+POST {{gateway}}/api/products/
+Content-Type: application/json
+
+{ "name": "USB-C Cable", "description": "1m", "price": 9.99, "stockQuantity": 500 }
+
+### Health (gateway). Service health endpoints are internal: /health/live and /health/ready
+GET {{gateway}}/health/ready

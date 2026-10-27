@@ -1,0 +1,19 @@
+# Keep the Docker build context small and avoid copying Windows build output into Linux images
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.user
+
+# Angular: dependencies and build output are recreated inside the image
+**/node_modules/
+**/dist/
+**/.angular/
+
+.git/
+.env
+*.md
+
+# Only the web-client image needs something from docker/ (its nginx template).
+# The Dockerfiles themselves are always read by Docker, whatever this file says.
+docker/postgres/

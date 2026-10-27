@@ -1,0 +1,53 @@
+@if (error()) {
+  <div class="alert error">{{ error() }}</div>
+}
+
+<div class="lab-layout">
+  <section class="card">
+    <h2>1. Break the Product Service</h2>
+    <p class="muted">Chaos mode makes <code>GET /api/products/&#123;id&#125;</code> return HTTP 500.
+      The Order Service calls that endpoint for every new order.</p>
+    <button [class.danger]="!chaosEnabled()" (click)="toggleChaos()">
+      {{ chaosEnabled() ? 'Turn chaos OFF (heal the service)' : 'Turn chaos ON (break the service)' }}
+    </button>
+    <p>Chaos mode: <strong [class.text-danger]="chaosEnabled()">{{ chaosEnabled() ? 'ON' : 'OFF' }}</strong></p>
+  </section>
+
+  <section class="card">
+    <h2>2. Circuit breaker state</h2>
+    <div class="circuit" [attr.data-state]="circuit()">{{ circuit() }}</div>
+    <p class="hint">
+      CLOSED: calls go through. OPEN: calls are rejected instantly for 20s.
+      HALF-OPEN: one trial call decides. It opens when 50% of at least 5 calls fail within 30s.
+    </p>
+  </section>
+</div>
+
+<section class="card">
+  <div class="row-between">
+    <h2>3. Send test orders <small class="muted">1 x Smartphone each, sent one after another</small></h2>
+    <div class="actions">
+      <button [disabled]="running()" (click)="sendOrders(1)">Send 1</button>
+      <button [disabled]="running()" (click)="sendOrders(5)">Send 5</button>
+    </div>
+  </div>
+  <p class="hint">
+    With chaos ON, the first orders take about a second (each one tries 3 times: the first call plus 2 retries).
+    Then the circuit OPENS, and the next orders fail in a few milliseconds without calling the Product Service.
+  </p>
+
+  <table>
+    <thead><tr><th>#</th><th>Result</th><th>Duration</th></tr></thead>
+    <tbody>
+      @for (r of results(); track r.attempt) {
+        <tr>
+          <td>{{ r.attempt }}</td>
+          <td [class.text-danger]="!r.ok">{{ r.message }}</td>
+          <td><strong>{{ r.durationMs }} ms</strong></td>
+        </tr>
+      } @empty {
+        <tr><td colspan="3" class="muted">No test orders sent yet.</td></tr>
+      }
+    </tbody>
+  </table>
+</section>

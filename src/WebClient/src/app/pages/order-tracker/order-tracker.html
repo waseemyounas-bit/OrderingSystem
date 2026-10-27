@@ -1,0 +1,76 @@
+<a routerLink="/orders" class="back">&larr; All orders</a>
+
+@if (error()) {
+  <div class="alert error">{{ error() }}</div>
+}
+
+@if (order(); as o) {
+  <section class="card">
+    <div class="row-between">
+      <div>
+        <h2>Order <code>{{ o.id }}</code></h2>
+        <p class="muted">{{ o.customerEmail }} &middot; {{ o.createdAt | date: 'medium' }}</p>
+      </div>
+      <span class="status" [attr.data-status]="o.status">{{ o.status }}</span>
+    </div>
+
+    @if (polling()) {
+      <p class="hint pulse">The saga is running. Checking for updates every second (202 Accepted means "processing")...</p>
+    }
+    @if (o.failureReason) {
+      <div class="alert error">{{ o.failureReason }}</div>
+    }
+
+    <table>
+      <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Subtotal</th></tr></thead>
+      <tbody>
+        @for (item of o.items; track item.id) {
+          <tr>
+            <td>{{ item.productName }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unitPrice | currency }}</td>
+            <td>{{ item.unitPrice * item.quantity | currency }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot><tr><td colspan="3">Total</td><td><strong>{{ o.totalAmount | currency }}</strong></td></tr></tfoot>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Saga progress <small class="muted">orchestrated by the Order Service over RabbitMQ</small></h2>
+    <ol class="stepper">
+      @for (s of steps(); track s.label) {
+        <li [attr.data-state]="s.state" [class.compensation]="s.compensation">
+          <span class="dot"></span>
+          <div>
+            <strong>{{ s.label }}</strong>
+            <small>{{ s.service }} &middot; {{ s.state }}</small>
+          </div>
+        </li>
+      }
+    </ol>
+
+    @if (saga(); as sg) {
+      <h3>Saga log <small class="muted">current step: {{ sg.currentStep }}</small></h3>
+      <ul class="timeline">
+        @for (entry of sg.log; track $index) {
+          <li>
+            <time>{{ entry.timestamp | date: 'HH:mm:ss.SSS' }}</time>
+            <span class="badge">{{ entry.step }}</span>
+            <span>{{ entry.message }}</span>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (cid()) {
+      <p class="hint">
+        Correlation id <code>{{ cid() }}</code>.
+        <a [href]="seqUrl()" target="_blank" rel="noopener">See the logs from every service for this order in Seq &rarr;</a>
+      </p>
+    }
+  </section>
+} @else if (!error()) {
+  <p class="muted">Loading order...</p>
+}

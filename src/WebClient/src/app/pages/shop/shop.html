@@ -1,0 +1,74 @@
+<section class="card">
+  <h2>Demo scenarios</h2>
+  <p class="muted">Each button places a real order. Watch the saga take a different path each time.</p>
+  <div class="scenarios">
+    @for (s of scenarios; track s.title) {
+      <button class="scenario" [disabled]="placing()" (click)="runScenario(s)">
+        <strong>{{ s.title }}</strong>
+        <span>{{ s.explains }}</span>
+      </button>
+    }
+  </div>
+</section>
+
+@if (error()) {
+  <div class="alert error">{{ error() }}</div>
+}
+
+<div class="shop-layout">
+  <section class="card">
+    <div class="row-between">
+      <h2>Products <small class="muted">Product Service</small></h2>
+      <button class="secondary" (click)="loadProducts()">Refresh stock</button>
+    </div>
+
+    @if (loading()) {
+      <p class="muted">Loading products...</p>
+    } @else {
+      <div class="product-grid">
+        @for (p of products(); track p.id) {
+          <article class="product">
+            <h3>{{ p.name }}</h3>
+            <p class="muted">{{ p.description }}</p>
+            <div class="row-between">
+              <span class="price">{{ p.price | currency }}</span>
+              <span class="badge" [class.warn]="p.stockQuantity < 5">{{ p.stockQuantity }} in stock</span>
+            </div>
+            <button (click)="cart.add(p)">Add to cart</button>
+          </article>
+        } @empty {
+          <p class="muted">No products found.</p>
+        }
+      </div>
+    }
+  </section>
+
+  <aside class="card cart">
+    <h2>Cart ({{ cart.count() }})</h2>
+
+    @for (line of cart.lines(); track line.product.id) {
+      <div class="cart-line">
+        <span>{{ line.product.name }}</span>
+        <input type="number" min="0" [ngModel]="line.quantity"
+               (ngModelChange)="cart.setQuantity(line.product.id, $event)" />
+      </div>
+    } @empty {
+      <p class="muted">Your cart is empty.</p>
+    }
+
+    @if (cart.count() > 0) {
+      <div class="row-between total">
+        <span>Total</span>
+        <strong>{{ cart.total() | currency }}</strong>
+      </div>
+      <label>
+        Email
+        <input type="email" [(ngModel)]="email" />
+      </label>
+      <button [disabled]="placing() || !email" (click)="checkout()">
+        {{ placing() ? 'Placing order...' : 'Place order' }}
+      </button>
+      <p class="hint">Totals over 1000 are declined by the Payment Service, so you can watch the compensation run.</p>
+    }
+  </aside>
+</div>

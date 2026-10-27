@@ -1,0 +1,182 @@
+# ==============================================================================
+#  Ordering System - full local environment
+#
+#    docker compose up --build -d        # build images and start everything
+#    docker compose logs -f order-service
+#    docker compose down                 # stop   (add -v to also delete DB/queue data)
+#
+#  Public URLs on your machine:
+#    Web UI (Angular)     http://localhost:4200        <- open this in your browser
+#    API Gateway          http://localhost:5000        <- the ONLY API entry point
+#    RabbitMQ UI          http://localhost:15672       (user/pass from .env)
+#    Seq (logs UI)        http://localhost:8081
+#    PostgreSQL           localhost:5432
+#
+#  Docker Compose -> Kubernetes mapping (for later):
+#    service            -> Deployment + Service (the service name stays the DNS name)
+#    environment        -> ConfigMap / Secret
+#    volumes            -> PersistentVolumeClaim
+#    healthcheck        -> readinessProbe / livenessProbe (our /health/ready + /health/live)
+#    ports              -> Service type LoadBalancer/NodePort or an Ingress (gateway only)
+# ==============================================================================
+
+name: ordering-system
+
+# Shared settings for the 3 business services (YAML anchor, reused below with <<: *service-defaults)
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [ordering-net]
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    seq:
+      condition: service_started
+
+x-common-env: &common-env
+  ASPNETCORE_ENVIRONMENT: Development
+  RabbitMq__Host: rabbitmq
+  RabbitMq__Username: ${RABBITMQ_USER}
+  RabbitMq__Password: ${RABBITMQ_PASSWORD}
+  Seq__ServerUrl: http://seq:5341
+
+services:
+
+  # ------------------------------------------------------------------ infrastructure
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs ONCE on an empty volume: creates productdb, orderdb, paymentdb (database-per-service)
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [ordering-net]
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"     # AMQP (apps)
+      - "15672:15672"   # management web UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks: [ordering-net]
+
+  seq:
+    image: datalust/seq:2025.2
+    container_name: seq
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"   # local demo only - no login
+    ports:
+      - "8081:80"       # web UI   (apps in Docker send logs to http://seq:5341 inside the network)
+      - "5341:5341"     # log ingestion from the host (services started with `dotnet run`)
+    volumes:
+      - seq-data:/data
+    networks: [ordering-net]
+
+  # ------------------------------------------------------------------ microservices
+  product-service:
+    <<: *service-defaults
+    build:
+      context: .                                       # repo root (BuildingBlocks is needed)
+      dockerfile: docker/product-service/Dockerfile
+    image: ordering/product-service:latest
+    container_name: product-service
+    environment:
+      <<: *common-env
+      ConnectionStrings__ProductDb: Host=postgres;Port=5432;Database=productdb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      RabbitMq__QueueName: product-service
+
+  order-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: docker/order-service/Dockerfile
+    image: ordering/order-service:latest
+    container_name: order-service
+    environment:
+      <<: *common-env
+      ConnectionStrings__OrderDb: Host=postgres;Port=5432;Database=orderdb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      RabbitMq__QueueName: order-service
+      Services__ProductServiceUrl: http://product-service:8080/   # Docker DNS: service name -> container
+
+  payment-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: docker/payment-service/Dockerfile
+    image: ordering/payment-service:latest
+    container_name: payment-service
+    environment:
+      <<: *common-env
+      ConnectionStrings__PaymentDb: Host=postgres;Port=5432;Database=paymentdb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      RabbitMq__QueueName: payment-service
+      Payment__MaxApprovedAmount: "1000"
+
+  # ------------------------------------------------------------------ edge
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/api-gateway/Dockerfile
+    image: ordering/api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Seq__ServerUrl: http://seq:5341
+      # Override YARP destinations from appsettings.json ("__" = nested config section)
+      ReverseProxy__Clusters__products-cluster__Destinations__primary__Address: http://product-service:8080/
+      ReverseProxy__Clusters__orders-cluster__Destinations__primary__Address: http://order-service:8080/
+      ReverseProxy__Clusters__payments-cluster__Destinations__primary__Address: http://payment-service:8080/
+    ports:
+      - "5000:8080"
+    depends_on:
+      - product-service
+      - order-service
+      - payment-service
+    networks: [ordering-net]
+
+  # ------------------------------------------------------------------ frontend
+  web-client:
+    build:
+      context: .
+      dockerfile: docker/web-client/Dockerfile
+    image: ordering/web-client:latest
+    container_name: web-client
+    restart: unless-stopped
+    environment:
+      API_GATEWAY_URL: http://api-gateway:8080   # nginx forwards /api/* here
+    ports:
+      - "4200:8080"     # http://localhost:4200
+    depends_on:
+      - api-gateway
+    networks: [ordering-net]
+
+networks:
+  ordering-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  seq-data:
