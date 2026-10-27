@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency: 
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  backend:
+    name: Build and Test Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+      - name: Test
+        run: dotnet test --no-build --verbosity normal --configuration Release
+      
+  frontend:
+    name: Build and Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: src/webclient/package-lock.json
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build --if-present --configuration Production
+      - name: Test
+        run: npm test --if-present
+
+    docker-lint:
+      name: Dockerfile + compose check
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v5
+        - name: Lint Dockerfile
+          uses: redcoolbeans/dockerfilelint-action@v1.0.0
+          with:
+            dockerfile: docker/product-service/Dockerfile
+        - name: Lint docker-compose.yml
+          uses: redcoolbeans/dockerfilelint-action@v1.0.0
+          with:
+            dockerfile: docker-compose.yml
+        - run: docker-compose config -q
+        - run: for f in docker/*.Dockerfile; do docker build --check -f $f .; done
