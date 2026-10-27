@@ -36,7 +36,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: /docker/${{ matrix.service }}/Dockerfile
+          file: docker/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
