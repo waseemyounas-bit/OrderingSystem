@@ -34,7 +34,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Trivy Security Scan
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@0.76.1
         with:
           image-ref: local/${{ matrix.service }}:scan
           format: table
