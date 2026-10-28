@@ -20,6 +20,13 @@ RUN npx ng build --configuration production
 # nginx-unprivileged = official nginx image that runs as a NON-ROOT user and listens on 8080
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS final
 
+# The base image can lag behind Alpine security fixes (Trivy flags them). Patch OS packages,
+# which needs root briefly, then drop back to the image's non-root nginx user (uid 101).
+USER root
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache
+USER 101
+
 # Where nginx forwards /api calls. A non-secret, environment-independent DEFAULT is a fine use of ENV;
 # override it per environment:  docker run -e API_GATEWAY_URL=http://my-gateway:8080 ...
 ENV API_GATEWAY_URL=http://api-gateway:8080
