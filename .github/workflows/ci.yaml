@@ -62,7 +62,7 @@ jobs:
     needs: [backend, frontend, docker-lint]
     # Only on pushes to main: PRs from Dependabot/forks don't receive secrets (SONAR_TOKEN).
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, windows]
 
     defaults:
       run:
