@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+    tags: ['v*.*.*']      # release tags -> semver image tags (e.g. 1.2.0)
 
 permissions:
   contents: read
@@ -109,4 +110,11 @@ jobs:
             /d:sonar.token="$env:SONAR_TOKEN"
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  docker:
+    name: Docker images
+    needs: [backend, frontend, docker-lint, sonarqube]
+    if: github.event_name == 'push'          # never publish images from PRs
+    uses: ./.github/workflows/docker.yaml    # reusable workflow (on: workflow_call)
+    secrets: inherit                         # pass DOCKERHUB_USERNAME / DOCKERHUB_TOKEN through
 
