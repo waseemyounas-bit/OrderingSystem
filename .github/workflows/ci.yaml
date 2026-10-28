@@ -14,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
   backend:
     name: Build and Test Backend
     runs-on: ubuntu-latest
@@ -56,7 +57,6 @@ jobs:
       - run: docker compose config --quiet
       - run: for f in docker/*/Dockerfile; do docker build --check -f "$f" .; done
     
-  
   sonarqube:
     name: SonarQube Quality Gate
     needs: [backend, frontend, docker-lint]
