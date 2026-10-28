@@ -18,7 +18,7 @@ RUN npx ng build --configuration production
 
 # ---------- Stage 2: serve the static files with nginx ----------
 # nginx-unprivileged = official nginx image that runs as a NON-ROOT user and listens on 8080
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS final
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS final
 
 # The base image can lag behind Alpine security fixes (Trivy flags them). Patch OS packages,
 # which needs root briefly, then drop back to the image's non-root nginx user (uid 101).
