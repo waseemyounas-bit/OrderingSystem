@@ -55,3 +55,55 @@ jobs:
       - run: cp .env.example .env         # .env is git-ignored
       - run: docker compose config --quiet
       - run: for f in docker/*/Dockerfile; do docker build --check -f "$f" .; done
+    
+  
+  sonarqube:
+    name: SonarQube Quality Gate
+    needs: [backend, frontend, docker-lint]
+    runs-on: [self-hosted, Windows]
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install SonarScanner
+        run: |
+          dotnet tool update --global dotnet-sonarscanner
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Analyze .NET Solution
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          dotnet sonarscanner begin `
+            /k:"$env:SONAR_PROJECT_KEY" `
+            /d:sonar.host.url="$env:SONAR_HOST_URL" `
+            /d:sonar.token="$env:SONAR_TOKEN" `
+            /d:sonar.qualitygate.wait=true `
+            /d:sonar.qualitygate.timeout=300
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          dotnet build OrderingSystem.slnx -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          dotnet sonarscanner end `
+            /d:sonar.token="$env:SONAR_TOKEN"
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+

@@ -33,8 +33,19 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # 1) Build into the local Docker daemon only (no push yet)
+      - name: Build image for scan
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.service }}/Dockerfile
+          load: true
+          tags: local/${{ matrix.service }}:scan
+          cache-from: type=gha,scope=${{ matrix.service }}
+
+      # 2) Fail the job on fixable CRITICAL/HIGH vulnerabilities
       - name: Trivy Security Scan
-        uses: aquasecurity/trivy-action@0.76.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/${{ matrix.service }}:scan
           format: table
@@ -43,7 +54,9 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
 
-      - uses: docker/build-push-action@v6
+      # 3) Push only if the scan passed (layers come from cache, so this is fast)
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/${{ matrix.service }}/Dockerfile
