@@ -81,7 +81,8 @@ jobs:
 
       - name: Install SonarScanner
         run: |
-          dotnet tool update --global dotnet-sonarscanner
+          # Scanner 12+ requires SonarQube 2025.1+; the local server is 10.6, so stay on 11.x until it's upgraded
+          dotnet tool update --global dotnet-sonarscanner --version "11.*"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Analyze .NET Solution
