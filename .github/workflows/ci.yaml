@@ -60,10 +60,9 @@ jobs:
   sonarqube:
     name: SonarQube Quality Gate
     needs: [backend, frontend, docker-lint]
-    # Only on pushes to main: never run PR code (forks, Dependabot) on the self-hosted machine,
-    # and PRs from Dependabot/forks don't receive secrets (SONAR_TOKEN) anyway.
+    # Only on pushes to main: PRs from Dependabot/forks don't receive secrets (SONAR_TOKEN).
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Windows]
+    runs-on: ubuntu-latest
 
     defaults:
       run:
