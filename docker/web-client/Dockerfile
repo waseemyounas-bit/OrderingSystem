@@ -5,7 +5,7 @@
 # =====================================================================
 
 # ---------- Stage 1: build the Angular app with Node ----------
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 # Same caching trick as the .NET images: install dependencies first (cached until package*.json changes)
