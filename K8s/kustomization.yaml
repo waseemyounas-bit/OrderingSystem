@@ -1,0 +1,57 @@
+# =====================================================================
+#  Kustomize (built into kubectl) - deploy everything with ONE command:
+#     kubectl apply -k K8s/
+#  Preview the final YAML without applying:
+#     kubectl kustomize K8s/
+# =====================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Puts every resource below into this namespace (so the files don't repeat it)
+namespace: ordering
+
+# Added to every resource, handy for: kubectl get all -l app.kubernetes.io/part-of=ordering-system -A
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ordering-system
+
+resources:
+  - namespace.yaml
+  - config/app-config.yaml
+  - infrastructure/postgres.yaml
+  - infrastructure/rabbitmq.yaml
+  - infrastructure/seq.yaml
+  - services/product-service.yaml
+  - services/order-service.yaml
+  - services/payment-service.yaml
+  - edge/api-gateway.yaml
+  - edge/web-client.yaml
+  - edge/ingress.yaml
+
+# Builds the Secret "app-secrets" from a git-ignored file (copy config/secrets.env.example).
+# Kustomize appends a content hash to the name (app-secrets-7h2k9...) and rewrites every
+# reference to it -> changing a password creates a new Secret and automatically rolls the pods.
+secretGenerator:
+  - name: app-secrets
+    envs:
+      - config/secrets.env
+
+# ONE place for image names + tags. The manifests use placeholder names (image: product-service);
+# this replaces them. The CD pipeline will run e.g.:
+#   kustomize edit set image product-service=waseembit/product-service:sha-1a2b3c4
+images:
+  - name: product-service
+    newName: waseembit/product-service
+    newTag: latest
+  - name: order-service
+    newName: waseembit/order-service
+    newTag: latest
+  - name: payment-service
+    newName: waseembit/payment-service
+    newTag: latest
+  - name: api-gateway
+    newName: waseembit/api-gateway
+    newTag: latest
+  - name: web-client
+    newName: waseembit/web-client
+    newTag: latest

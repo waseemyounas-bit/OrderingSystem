@@ -1,0 +1,75 @@
+# OrderService - saga orchestrator. Same pattern as product-service.yaml (see comments there).
+# Extra: it calls ProductService over HTTP (circuit breaker) via the Service DNS name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: order-service
+          image: order-service
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD }
+            - name: ConnectionStrings__OrderDb
+              value: Host=postgres;Port=5432;Database=orderdb;Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD)
+            - name: RabbitMq__Username
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: RABBITMQ_USER }
+            - name: RabbitMq__Password
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: RABBITMQ_PASSWORD }
+            - name: RabbitMq__QueueName
+              value: order-service
+            # Service DNS -> load-balanced across all ready product-service pods
+            - name: Services__ProductServiceUrl
+              value: http://product-service:8080/
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false

@@ -1,0 +1,62 @@
+# =====================================================================
+#  API Gateway (YARP) - the single entry point for API calls.
+#  ClusterIP: not exposed directly; the Ingress -> web-client (nginx) -> gateway.
+#  It's stateless, so it can run several replicas behind its Service.
+# =====================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: api-gateway
+          image: api-gateway
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - { name: ASPNETCORE_ENVIRONMENT, value: Production }
+            - { name: Seq__ServerUrl, value: "http://seq:5341" }
+            # YARP destinations = Kubernetes Service names. Each Service already load-balances
+            # across its pods, so YARP needs just ONE address per cluster.
+            - name: ReverseProxy__Clusters__products-cluster__Destinations__primary__Address
+              value: http://product-service:8080/
+            - name: ReverseProxy__Clusters__orders-cluster__Destinations__primary__Address
+              value: http://order-service:8080/
+            - name: ReverseProxy__Clusters__payments-cluster__Destinations__primary__Address
+              value: http://payment-service:8080/
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false

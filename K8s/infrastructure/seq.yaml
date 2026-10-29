@@ -1,0 +1,64 @@
+# =====================================================================
+#  Seq (central logs) - Deployment + PVC + Service
+#  A Deployment with a standalone PVC is fine for a single-instance tool.
+#  strategy: Recreate -> old pod stops BEFORE the new one starts, because a
+#  ReadWriteOnce volume can't be mounted by two pods at the same time.
+# =====================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seq-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seq
+spec:
+  selector:
+    app: seq
+  ports:
+    - name: ui                # kubectl port-forward svc/seq 8081:80 -n ordering
+      port: 80
+    - name: ingestion         # services send logs to http://seq:5341
+      port: 5341
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seq
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: seq
+  template:
+    metadata:
+      labels:
+        app: seq
+    spec:
+      containers:
+        - name: seq
+          image: datalust/seq:2025.2
+          ports:
+            - { name: ui, containerPort: 80 }
+            - { name: ingestion, containerPort: 5341 }
+          env:
+            - { name: ACCEPT_EULA, value: "Y" }
+            - { name: SEQ_FIRSTRUN_NOAUTHENTICATION, value: "true" }   # demo only - no login
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: seq-data

@@ -1,0 +1,53 @@
+# =====================================================================
+#  Web client (Angular served by nginx). nginx also proxies /api, /swagger, /docs
+#  to the gateway, so the browser talks to ONE origin (no CORS).
+# =====================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-client
+spec:
+  selector:
+    app: web-client
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: web-client
+  template:
+    metadata:
+      labels:
+        app: web-client
+    spec:
+      securityContext:
+        runAsNonRoot: true       # nginx-unprivileged runs as uid 101
+      containers:
+        - name: web-client
+          image: web-client
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: API_GATEWAY_URL            # injected into nginx.conf.template at startup
+              value: http://api-gateway:8080
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false

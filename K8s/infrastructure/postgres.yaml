@@ -1,0 +1,103 @@
+# =====================================================================
+#  PostgreSQL - StatefulSet + headless Service + init script
+#
+#  Why a StatefulSet (not a Deployment)?
+#    - Stable pod name (postgres-0) and stable storage: its PersistentVolumeClaim
+#      stays bound to the same pod even after restarts / rescheduling.
+#    - Deployments are for stateless apps whose pods are interchangeable.
+# =====================================================================
+
+# Runs ONCE on an empty volume (same as docker/postgres/init-databases.sql in compose).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  init-databases.sql: |
+    -- Database per service on one server
+    CREATE DATABASE productdb;
+    CREATE DATABASE orderdb;
+    CREATE DATABASE paymentdb;
+---
+# Headless Service (clusterIP: None): no load-balancing virtual IP, the DNS name "postgres"
+# points straight at the pod. Required by the StatefulSet (serviceName below).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres              # must match the pod template labels below
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            # Values come from the Secret, never written in this file
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD }
+            # Volumes often contain a "lost+found" folder; Postgres refuses a non-empty data dir,
+            # so store the data in a subfolder.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          # Probes = compose healthcheck. exec runs a command inside the container.
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }   # what the scheduler reserves
+            limits: { memory: 512Mi }                 # killed (OOMKilled) above this
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init
+  # One PVC per pod, created automatically (data-postgres-0). It is NOT deleted with the
+  # StatefulSet (data survives deleting/recreating the pods or the StatefulSet), only when the
+  # PVC itself or the whole namespace is deleted.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi

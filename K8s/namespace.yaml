@@ -1,0 +1,6 @@
+# A Namespace is a virtual "folder" inside the cluster. Everything for this app lives in `ordering`,
+# so it can't clash with other apps and can be removed in one go:  kubectl delete namespace ordering
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ordering

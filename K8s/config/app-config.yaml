@@ -1,0 +1,14 @@
+# ConfigMap = NON-secret settings, shared by the 3 business services (compose: x-common-env).
+# Pods load every key as an environment variable via `envFrom: configMapRef`.
+# "__" in a key = nested .NET config section, e.g. RabbitMq__Host -> RabbitMq:Host.
+#
+# Service names are DNS names inside the cluster: "rabbitmq" resolves to the rabbitmq Service,
+# exactly like the service name did on the docker-compose network.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  RabbitMq__Host: rabbitmq
+  Seq__ServerUrl: http://seq:5341

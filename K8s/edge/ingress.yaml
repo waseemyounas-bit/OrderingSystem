@@ -1,0 +1,26 @@
+# =====================================================================
+#  Ingress = HTTP routing rules from OUTSIDE the cluster to Services
+#  (compose equivalent: the "ports:" mapping 4200:8080 on web-client).
+#
+#  An Ingress is only a set of rules; an INGRESS CONTROLLER (here: ingress-nginx) must be
+#  installed in the cluster to actually serve them. See K8s/README.md.
+#
+#  Flow:  browser -> http://localhost/ -> ingress-nginx -> web-client:8080
+#                                          (nginx in web-client) /api/* -> api-gateway:8080 -> services
+# =====================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ordering
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:                    # no "host:" = matches any hostname (localhost for local clusters)
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client
+                port:
+                  name: http
