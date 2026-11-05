@@ -1,0 +1,9 @@
+# Phase 1: single-node cluster. The one node is both control plane and worker.
+#   kind create cluster --config kind/cluster-1node.yaml
+#   kind delete cluster --name solo
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: solo
+nodes:
+  - role: control-plane
+  - role: worker

@@ -1,0 +1,8 @@
+# Pins the ingress-nginx controller to the node that has the host port mapping.
+# Only lab-control-plane publishes localhost:8000 -> :80 (see kind/cluster-3node.yaml).
+#   kubectl -n ingress-nginx patch deploy ingress-nginx-controller --patch-file docs/labs/ingress/01-controller-on-control-plane.yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        ingress-ready: "true"

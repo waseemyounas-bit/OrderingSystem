@@ -1,0 +1,24 @@
+# Rewrite: the browser calls /gw/api/orders, the gateway receives /api/orders.
+# Annotations are CONTROLLER-SPECIFIC: this one only means something to ingress-nginx.
+# GKE's controller, Traefik, etc. ignore it (Gateway API makes rewrites a standard field).
+#   kubectl apply -f docs/labs/ingress/04-rewrite.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lab-rewrite
+  namespace: ordering
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2   # $2 = second regex group below
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /gw(/|$)(.*)
+            pathType: ImplementationSpecific   # regex paths are not part of the Ingress spec
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  name: http

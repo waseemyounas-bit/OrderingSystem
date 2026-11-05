@@ -1,0 +1,6 @@
+# kind's kubelets use self-signed certificates, so metrics-server must skip verifying them.
+# (Lab-only: on GKE metrics-server is pre-installed and configured correctly.)
+#   kubectl -n kube-system patch deploy metrics-server --type=json --patch-file kind/metrics-server-patch.yaml
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --kubelet-insecure-tls

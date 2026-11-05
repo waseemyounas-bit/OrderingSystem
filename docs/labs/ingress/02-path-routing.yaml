@@ -1,0 +1,21 @@
+# Path-based routing: /api goes straight to the gateway, everything else to the Angular app.
+# Coexists with K8s/edge/ingress.yaml (path "/"); the controller merges all Ingresses
+# for the same host and the LONGEST matching path wins.
+#   kubectl apply -f docs/labs/ingress/02-path-routing.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lab-api
+  namespace: ordering
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api               # Prefix matches /api and /api/orders, NOT /apix
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  name: http

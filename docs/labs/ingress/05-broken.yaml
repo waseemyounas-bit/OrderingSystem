@@ -1,0 +1,53 @@
+# Failure drills. Each uses its own host, so they can be applied together:
+#   kubectl apply -f docs/labs/ingress/05-broken.yaml
+# Predict each symptom first, then check with describe ingress, curl.exe and the controller logs.
+---
+# A) No ingressClassName -> which controller owns it?
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-noclass
+  namespace: ordering
+spec:
+  rules:
+    - host: noclass.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web-client, port: { name: http } }
+---
+# B) Service name typo
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-svc
+  namespace: ordering
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: typo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web-clinet, port: { name: http } }
+---
+# C) Ingress in a different namespace than the Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-ns
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ns.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web-client, port: { name: http } }

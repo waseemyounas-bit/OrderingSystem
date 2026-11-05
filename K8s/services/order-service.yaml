@@ -31,6 +31,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: order-service
+          imagePullPolicy: IfNotPresent
           image: order-service
           ports:
             - name: http
@@ -73,3 +74,14 @@ spec:
             limits: { memory: 256Mi }
           securityContext:
             allowPrivilegeEscalation: false
+      # K8s/services/order-service.yaml → spec.template.spec (same level as containers:)
+      topologySpreadConstraints:
+        - maxSkew: 1                                 # node counts may differ by at most 1
+          topologyKey: topology.kubernetes.io/zone    # spread across zone-a / zone-b
+          whenUnsatisfiable: DoNotSchedule            # a rule, not a preference
+          labelSelector:
+            matchLabels:
+              app: order-service                      # which pods to count
+          matchLabelKeys:
+            - pod-template-hash                       # count only pods from the SAME release
+

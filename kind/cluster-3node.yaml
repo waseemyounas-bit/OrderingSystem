@@ -1,0 +1,23 @@
+# Phase 2: 1 control plane + 2 workers. Each node is a Docker container.
+#   kind create cluster --config kind/cluster-3node.yaml
+#   kind delete cluster --name lab
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: lab
+nodes:
+  - role: control-plane
+    labels:
+      ingress-ready: "true"        # the ingress/gateway controller is pinned to this node
+    extraPortMappings:             # http://localhost reaches the controller without port-forward
+      - containerPort: 80
+        hostPort: 8000
+      - containerPort: 443
+        hostPort: 8443
+  # Pretend the two workers are in different zones (like us-central1-a / -b on GKE),
+  # so topology spread and zone failure can be practised locally.
+  - role: worker
+    labels:
+      topology.kubernetes.io/zone: zone-a
+  - role: worker
+    labels:
+      topology.kubernetes.io/zone: zone-b

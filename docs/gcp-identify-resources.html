@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Identify GCP Resources · Ordering System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..900&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Standalone page: works offline too (falls back to system fonts). Light/dark follows your OS. */
+:root {
+  --paper: #f3f6fb; --grid: #e3e9f3; --sheet: #ffffff; --ink: #15233b; --muted: #5a6880; --rule: #cfd8e6;
+  --compute: #2f6fde; --data: #0e9b78; --network: #d9821a; --iam: #c23f7a; --supply: #7a5ad1; --obs: #5b7a99;
+  --good: #12805c; --warn: #b7791f; --code-bg: #eef2f8; --hl: #fff2c4; --focus: #2563eb;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f1622; --grid: #182233; --sheet: #151f2e; --ink: #e6edf7; --muted: #9aabc2; --rule: #2a3a52;
+    --compute: #6b9bf2; --data: #34c39d; --network: #f0a144; --iam: #e5679f; --supply: #a68cf0; --obs: #8fa9c4;
+    --good: #3cc58f; --warn: #e3ac4a; --code-bg: #111a27; --hl: #3b3417; --focus: #7aa7ff;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--ink); font-family: var(--font-body); font-size: 16.5px; line-height: 1.55;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 32px 16px 72px; display: grid; gap: 24px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; line-height: 1.08; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 900; font-stretch: 80%; }
+h3 { font-size: 1.15rem; font-weight: 800; font-stretch: 90%; }
+p { margin: 0; }
+code { font-family: var(--font-code); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+.muted { color: var(--muted); }
+.lede { color: var(--muted); max-width: 70ch; }
+.lede b { color: var(--ink); }
+.eyebrow { font: 700 .78rem var(--font-code); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.head { display: grid; gap: 10px; }
+.sheet { background: var(--sheet); border: 1.5px solid var(--rule); border-radius: 14px; padding: 20px 22px; min-width: 0; }
+.stack { display: grid; gap: 16px; }
+
+.c-compute { color: var(--compute); } .c-data { color: var(--data); } .c-network { color: var(--network); }
+.c-iam { color: var(--iam); } .c-supply { color: var(--supply); } .c-obs { color: var(--obs); }
+
+.sorter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .sorter { grid-template-columns: minmax(0, 1fr); } }
+.col-title { font: 700 .75rem var(--font-code); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.items, .questions, .bins { display: grid; gap: 8px; }
+.items { gap: 6px; }
+.item { text-align: left; font: 600 .95rem var(--font-body); color: var(--ink); background: var(--sheet); border: 1.5px solid var(--rule); border-radius: 10px; padding: 7px 11px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.item small { font: 600 .72rem var(--font-code); color: var(--muted); }
+.item.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink) inset; }
+.q { border: 1.5px dashed var(--rule); border-radius: 12px; padding: 9px 12px; display: grid; gap: 2px; transition: background .25s, border-color .25s; }
+.q .qt { font-weight: 700; }
+.q .qa { font-size: .88rem; color: var(--muted); }
+.q.on { border-style: solid; border-color: currentColor; background: var(--hl); }
+.bin { border: 1.5px solid var(--rule); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; background: var(--sheet); transition: transform .25s, border-color .25s; }
+.bin .bt { font-family: var(--font-display); font-weight: 800; font-stretch: 88%; font-size: 1.02rem; }
+.bin .bd { font-size: .86rem; color: var(--muted); }
+.bin.on { border-color: currentColor; box-shadow: 0 0 0 2px currentColor inset; transform: translateX(-4px); }
+.verdict-line { font-size: 1rem; background: var(--code-bg); border-radius: 10px; padding: 10px 14px; min-height: 3.2em; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { font: 700 .9rem var(--font-body); color: var(--ink); background: var(--sheet); border: 1.5px solid var(--rule); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--ink); }
+.btn:focus-visible, .item:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 700 .74rem var(--font-code); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pick { font-weight: 700; color: var(--good); white-space: nowrap; }
+.later { font-weight: 700; color: var(--warn); white-space: nowrap; }
+.disclaim { font-size: .82rem; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .bin, .q { transition: none; } }
+@media print {
+  body { background: #fff; }
+  .controls { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <span class="eyebrow">Ordering System · GCP blueprint · Section 1</span>
+    <h1>Identify the resources: run every piece through six questions</h1>
+    <p class="lede">Don't start from the GCP product list. Start from <b>what you already run</b>: your <code>docker-compose.yml</code> and <code>K8s/</code> folder. For each piece, ask what it <b>does</b>. The answer tells you which kind of cloud resource it needs. Watch the sorting machine, or click any piece.</p>
+  </header>
+
+  <div class="sheet stack">
+    <div class="sorter">
+      <div>
+        <div class="col-title">What you already have</div>
+        <div class="items" id="items"></div>
+      </div>
+      <div>
+        <div class="col-title">The question that matches</div>
+        <div class="questions">
+          <div class="q c-compute" data-cat="compute"><span class="qt">Does it run code?</span><span class="qa">→ Compute: a place for containers to run</span></div>
+          <div class="q c-data" data-cat="data"><span class="qt">Does it keep data after a restart?</span><span class="qa">→ Storage: disks or a managed database</span></div>
+          <div class="q c-network" data-cat="network"><span class="qt">Does it talk to the internet or other pieces?</span><span class="qa">→ Network: VPC, load balancer, IPs</span></div>
+          <div class="q c-iam" data-cat="iam"><span class="qt">Does someone or something need permission?</span><span class="qa">→ Identity: service accounts and roles</span></div>
+          <div class="q c-supply" data-cat="supply"><span class="qt">Is it an artifact we build and store?</span><span class="qa">→ Supply chain: registry, state bucket</span></div>
+          <div class="q c-obs" data-cat="obs"><span class="qt">Does it help us see what's happening?</span><span class="qa">→ Observability: logs and metrics</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="col-title">GCP resource we pick</div>
+        <div class="bins">
+          <div class="bin c-compute" data-cat="compute"><span class="bt">GKE cluster + node pool</span><span class="bd">Runs every Deployment and StatefulSet from K8s/</span></div>
+          <div class="bin c-data" data-cat="data"><span class="bt">Persistent Disk (via PVC)</span><span class="bd">Postgres, RabbitMQ and Seq data. Cloud SQL later.</span></div>
+          <div class="bin c-network" data-cat="network"><span class="bt">VPC + subnet (+ LB later)</span><span class="bd">Pod/Service IP ranges. Ingress creates a load balancer.</span></div>
+          <div class="bin c-iam" data-cat="iam"><span class="bt">Service accounts + roles</span><span class="bd">Nodes, GitHub Actions, you. Workload Identity Federation, no keys.</span></div>
+          <div class="bin c-supply" data-cat="supply"><span class="bt">Artifact Registry + GCS bucket</span><span class="bd">Container images; Terraform state file.</span></div>
+          <div class="bin c-obs" data-cat="obs"><span class="bt">Seq in-cluster + Cloud Logging</span><span class="bd">Cloud Logging is on by default (50 GiB/month free).</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="verdict-line" id="verdict" aria-live="polite"></p>
+    <div class="controls">
+      <button class="btn" id="play" aria-pressed="true">⏸ Pause machine</button>
+      <span class="muted" style="font-size:.9rem">Clicking a piece pauses the machine on it.</span>
+    </div>
+  </div>
+
+  <div class="sheet stack">
+    <h3>Decision table: every option we considered, and why</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Piece</th><th>Options on GCP</th><th class="num">~ $/month</th><th>Decision</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><b>Run the containers</b></td><td>GKE Standard (zonal)<br>GKE Autopilot<br>Cloud Run</td><td class="num">nodes only*<br>per pod request<br>per request</td><td><span class="pick">✔ Standard</span></td><td>You want to learn Kubernetes: nodes, node pools, scheduling. The management fee of one zonal cluster is covered by the GKE free tier. Cloud Run isn't Kubernetes.</td></tr>
+          <tr><td><b>PostgreSQL</b></td><td>StatefulSet + disk (have it)<br>Cloud SQL db-f1-micro<br>Cloud SQL + HA</td><td class="num">≈ 0.3<br>≈ 9<br>≈ 50+</td><td><span class="pick">✔ In-cluster</span><br><span class="later">→ Cloud SQL later</span></td><td>Your manifests already work. Cloud SQL is what production uses (backups, patching), so it makes a good second step.</td></tr>
+          <tr><td><b>RabbitMQ</b></td><td>StatefulSet + disk<br>Pub/Sub (code change)</td><td class="num">≈ 0.1<br>≈ 0</td><td><span class="pick">✔ In-cluster</span></td><td>GCP has no managed RabbitMQ. Pub/Sub would mean rewriting the messaging code.</td></tr>
+          <tr><td><b>Logs (Seq)</b></td><td>Seq in-cluster<br>Cloud Logging</td><td class="num">≈ 0.1<br>0 (≤ 50 GiB)</td><td><span class="pick">✔ Both</span></td><td>GKE ships container stdout to Cloud Logging for free. Keep Seq for the structured view you already know.</td></tr>
+          <tr><td><b>Container images</b></td><td>Docker Hub (have it)<br>Artifact Registry</td><td class="num">0<br>≈ 0.1–0.5</td><td><span class="pick">✔ Artifact Registry</span></td><td>Nodes pull with IAM (no Docker Hub token), the images stay in the same region, and nothing goes out to the public internet.</td></tr>
+          <tr><td><b>Way in from internet</b></td><td><code>kubectl port-forward</code><br>Ingress → HTTP(S) LB</td><td class="num">0<br>≈ 18+</td><td><span class="pick">✔ port-forward</span><br><span class="later">→ LB when needed</span></td><td>The load balancer is the biggest single line item. Turn it on when you want a public URL, then turn it off again.</td></tr>
+          <tr><td><b>Network</b></td><td>Custom VPC + subnet<br>default VPC</td><td class="num">0<br>0</td><td><span class="pick">✔ Custom VPC</span></td><td>You choose the IP ranges for nodes, pods and Services. Never build on the auto-created default network.</td></tr>
+          <tr><td><b>Secrets</b></td><td>K8s Secret (have it)<br>Secret Manager</td><td class="num">0<br>≈ 0</td><td><span class="pick">✔ K8s Secret</span><br><span class="later">→ Secret Manager later</span></td><td>Keep the current setup. Later the CD pipeline can read from Secret Manager instead of a file.</td></tr>
+          <tr><td><b>Terraform state</b></td><td>Local file<br>GCS bucket</td><td class="num">0<br>≈ 0.02</td><td><span class="pick">✔ GCS bucket</span></td><td>Shared by you and CI, versioned (undo), and locked so two applies can't run at once.</td></tr>
+          <tr><td><b>CI → GCP login</b></td><td>JSON key in GitHub secret<br>Workload Identity Federation</td><td class="num">0<br>0</td><td><span class="pick">✔ WIF</span></td><td>No long-lived key to leak. GitHub proves who it is with a short-lived token.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="disclaim">* GKE Standard bills the VMs, disks and IPs. The cluster fee ($0.10/h) is offset by the free-tier credit of $74.40/month per billing account for one zonal or Autopilot cluster. All prices are approximate us-central1 list prices; check them with the Google Cloud pricing calculator.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PIECES = [
+    { name: 'product / order / payment', tag: 'Deployment', cat: 'compute', say: 'They <b>run code</b>, so they go to <b>Compute</b>: Deployments on the GKE node pool.' },
+    { name: 'api-gateway + web-client', tag: 'Deployment', cat: 'compute', say: 'Also <b>code</b>, stateless, so the same node pool. Scaling them only adds pods, not new resources.' },
+    { name: 'PostgreSQL', tag: 'StatefulSet', cat: 'data', say: 'It <b>keeps data</b>. The PVC asks GKE for a <b>Persistent Disk</b>. Later: swap for <b>Cloud SQL</b>.' },
+    { name: 'RabbitMQ', tag: 'StatefulSet', cat: 'data', say: 'It <b>keeps queued messages</b>, so it gets a Persistent Disk too. GCP has no managed RabbitMQ.' },
+    { name: 'Ingress', tag: 'edge', cat: 'network', say: 'It <b>talks to the internet</b>. On GKE an Ingress creates a <b>Google load balancer</b>. That costs money, so add it only when needed.' },
+    { name: 'Pods talking to each other', tag: 'DNS', cat: 'network', say: 'Pods and Services need <b>IP addresses</b>, so we need a <b>VPC + subnet</b> with secondary ranges for pods and Services.' },
+    { name: 'GitHub Actions deploy', tag: 'CI/CD', cat: 'iam', say: 'Something outside GCP <b>needs permission</b>, so it gets a <b>service account + Workload Identity Federation</b>.' },
+    { name: 'Node VMs pulling images', tag: 'kubelet', cat: 'iam', say: 'The nodes <b>need permission</b> to pull images, so we give them a dedicated <b>gke-nodes@</b> service account with read-only roles.' },
+    { name: 'Docker images', tag: 'CI output', cat: 'supply', say: 'An <b>artifact we build and store</b>, so it goes in <b>Artifact Registry</b>, next to the cluster in the same region.' },
+    { name: 'Terraform state', tag: '.tfstate', cat: 'supply', say: 'Terraform\'s memory of what exists. Stored in a <b>versioned GCS bucket</b> so it\'s shared, locked and backed up.' },
+    { name: 'Seq + stdout logs', tag: 'logging', cat: 'obs', say: 'It <b>helps us see</b>. Seq stays in-cluster, and GKE also sends logs to <b>Cloud Logging</b> for free.' },
+    { name: '.env passwords', tag: 'secret', cat: 'iam', say: 'Sensitive values need <b>access control</b>. For now a K8s Secret; later <b>Secret Manager</b> with an IAM role per secret.' }
+  ];
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var itemsEl = document.getElementById('items'), playBtn = document.getElementById('play');
+  var idx = 0, timer = null, running = !reduce;
+
+  PIECES.forEach(function (p, i) {
+    var b = document.createElement('button');
+    b.className = 'item';
+    b.innerHTML = '<span>' + p.name + '</span><small>' + p.tag + '</small>';
+    b.onclick = function () { setRunning(false); show(i); };
+    itemsEl.appendChild(b);
+  });
+
+  function show(i) {
+    idx = i; var p = PIECES[i];
+    document.querySelectorAll('.item').forEach(function (el, k) { el.classList.toggle('on', k === i); });
+    document.querySelectorAll('.q').forEach(function (el) { el.classList.toggle('on', el.dataset.cat === p.cat); });
+    document.querySelectorAll('.bin').forEach(function (el) { el.classList.toggle('on', el.dataset.cat === p.cat); });
+    document.getElementById('verdict').innerHTML = '<b>' + p.name + ':</b> ' + p.say;
+  }
+  function setRunning(on) {
+    running = on; clearInterval(timer);
+    playBtn.textContent = on ? '⏸ Pause machine' : '▶ Run machine';
+    playBtn.setAttribute('aria-pressed', String(on));
+    if (on) timer = setInterval(function () { show((idx + 1) % PIECES.length); }, 2600);
+  }
+  playBtn.onclick = function () { setRunning(!running); };
+  show(0); setRunning(running);
+})();
+</script>
+</body>
+</html>

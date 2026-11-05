@@ -22,11 +22,13 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /swagger {
+    # ^~ = if this prefix matches, skip the regex locations below. Without it, the Swagger UI's
+    # .js/.css files match the static-file regex and are looked up locally -> 404 -> blank page.
+    location ^~ /swagger {
         proxy_pass ${API_GATEWAY_URL};
     }
 
-    location /docs/ {
+    location ^~ /docs/ {
         proxy_pass ${API_GATEWAY_URL};
     }
 

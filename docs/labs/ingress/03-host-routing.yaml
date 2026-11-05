@@ -1,0 +1,31 @@
+# Host-based routing: one IP/port, different apps chosen by the HTTP Host header.
+# *.localhost resolves to 127.0.0.1 in browsers, no hosts-file edit needed.
+#   kubectl apply -f docs/labs/ingress/03-host-routing.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lab-hosts
+  namespace: ordering
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client
+                port:
+                  name: http
+    - host: gateway.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  name: http
