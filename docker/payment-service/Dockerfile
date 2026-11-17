@@ -5,7 +5,7 @@
 # =====================================================================
 
 # ---------- Stage 1: build (big image with the full .NET SDK) ----------
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 # Copy ONLY project files first and restore. Docker caches this layer, so NuGet packages
