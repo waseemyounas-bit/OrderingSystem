@@ -20,7 +20,7 @@ COPY src/Services/OrderService/ src/Services/OrderService/
 RUN dotnet publish src/Services/OrderService/OrderService.csproj -c Release -o /app/publish --no-restore
 
 # ---------- Stage 2: runtime (small image, only the ASP.NET runtime) ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
